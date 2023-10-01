@@ -1,8 +1,6 @@
 import numpy as np
-
-def relu(x: np.array):
-        x[x < 0] = 0
-
+import utils
+from baseLayers import *
 def softmax(x: np.array):
     raised = np.exp(x - np.max(x, axis=1, keepdims=True))
     return np.divide(raised, np.sum(raised, axis=1, keepdims=True))
@@ -12,7 +10,7 @@ def scaled_softmax(x: np.array):
     raised = np.exp(scaled - np.max(scaled, axis=1, keepdims=True))
     return np.divide(raised, np.sum(raised, axis=1, keepdims=True))
 
-class SelfAttentionHead:
+class SelfAttentionHead(Layer):
     def __init__(self, sequence_length_in: int, token_length_in: int,):
         self.token_length = token_length_in
         self.sequence_length = sequence_length_in 
@@ -29,19 +27,23 @@ class SelfAttentionHead:
         self.attention_weights = np.zeros((sequence_length_in, sequence_length_in))
         self.output =  np.zeros((sequence_length_in, token_length_in))
 
-    def attend(self, inputToken: np.array):
+    def forward(self, inputToken: np.array):
         assert(inputToken.shape == (self.sequence_length, self.token_length))
         self.queries = inputToken @ self.query_weights
         self.keys = inputToken @ self.key_weights
         self.values = inputToken @ self.val_weights
         self.attention_weights = scaled_softmax(self.queries @ self.keys.T)
         self.output = self.attention_weights @ self.values
+    
+    def backward(self, loss: float):
+
+
 
 # Typically dIn is defaulted to sequence_length / h
 class MultiHeadSelfAttention:
     def __init__(self, sequence_length_in: int, token_length_in: int, number_of_heads: int):
         self.heads = np.array([], dtype=SelfAttentionHead)
         for _ in range(number_of_heads):
-            self.heads = np.append(self.heads, SelfAttentionHead(sequence_length_in, token_length_in))
+            self.heads = np.append(self.heads, SelfAttentionHead(sequence_length_in, (token_length_in/number_of_heads)))
         print(self.heads)
         
