@@ -224,4 +224,3 @@ class FullyConnectedLayer(Layer):
         
         self.weights -= self.learning_rate * weight_gradients
         return input_gradients
-
