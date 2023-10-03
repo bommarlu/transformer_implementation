@@ -60,6 +60,7 @@ class SoftmaxLayer(Layer):
     def backward(self, upstream_gradient):
         super().backward()
         gradient = ((1.0 / self.scale) * self.output * (1 - self.output)) * upstream_gradient
+        logger.info(f'Softmax gradient:\n{gradient}')
         return gradient
 
 

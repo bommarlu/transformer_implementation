@@ -31,7 +31,7 @@ def test_initial_weights():
     new_layer = FullyConnectedLayer(4, 3, starting_weights_in=weights)
     new_layer.set_weights(weights)
 
-def test_backward():
+def test_backward_fc():
     weights = np.array([[1, 1, 1, 1],
                         [1, 1, 1, 1],
                         [1, 1, 1, 1],]).T
@@ -43,6 +43,22 @@ def test_backward():
     new_layer.backward(upstream_gradient)
     print_weights(new_layer)
 
+
+def test_softmax():
+    softmax = SoftmaxLayer(axis=1)
+    soft_in = np.array([[0, 1], [1, 1]])
+    soft_out =  softmax.forward(soft_in)
+    print(soft_out)
+    print(np.sum(np.power(soft_out, 2)))
+    while np.sum(np.power(soft_out, 2)) > 1:
+        soft_out =  softmax.forward(soft_in)
+        soft_out_back = softmax.backward(2*soft_out)
+        soft_in = soft_in - soft_out_back * 0.5
+        print(soft_out)
+        print(np.sum(np.power(soft_out, 2)))
+
 # test_forward_name()
 # test_set_get_weights()
-test_backward()
+# test_backward_fc()
+
+test_softmax()

@@ -28,7 +28,7 @@ class AttentionLayer(Layer):
     
     def set_key_weights(self, key_weights):
         self.key_layer.set_weights(key_weights)
-    def get_key_weights(self, value_weights):
+    def get_key_weights(self):
         return self.key_layer.get_weights()
     def set_query_weights(self, query_weights):
         self.query_layer.set_weights(query_weights)
@@ -38,17 +38,24 @@ class AttentionLayer(Layer):
     
     def forward(self, tokens_in: np.array):
         super().forward()
-        queryMatrix = self.query_layer.forward(tokens_in=tokens_in)
-        keyMatrix = self.key_layer.forward(tokens_in=tokens_in)
+        logger.info(f'Query Weights:\n{self.query_layer.get_weights()}')
+        logger.info(f'Key Weights:\n{self.query_layer.get_weights()}')
+        self.queryMatrix = self.query_layer.forward(tokens_in=tokens_in)
+        self.keyMatrix = self.key_layer.forward(tokens_in=tokens_in)
         logger.info(f'Calculating attention matrix of shape {self.attention_shape}')
-        pre_softmax = queryMatrix @ keyMatrix.T
+        pre_softmax = self.queryMatrix @ self.keyMatrix.T
+        logger.info(f'Attention matrix:\n{pre_softmax}')
         self.attention = self.softmax_layer.forward(data_in=pre_softmax)
         logger.info(f'Attention:\n{self.attention}')
         return np.copy(self.attention)
     
-    def backward(self, loss: float):
+    def backward(self, upstream_grad: float):
         super().backward()
-
+        softmax_grad = self.softmax_layer.backward(upstream_grad)
+        query_grad = softmax_grad @ self.keyMatrix
+        key_grad = softmax_grad.T @ self.queryMatrix
+        return self.query_layer.backward(query_grad), self.key_layer.backward(key_grad)
+        
 class SelfAttentionHead(Layer):
     def __init__(self, sequence_length_in: int, token_length_in: int, name='attention_head'):
         super().__init__()
