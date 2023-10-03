@@ -57,8 +57,27 @@ def test_softmax():
         print(soft_out)
         print(np.sum(np.power(soft_out, 2)))
 
+def test_fc_with_softmax():
+    weights = np.random.rand(4, 2)
+    new_layer = FullyConnectedLayer(4, 2, starting_weights_in=weights)
+
+    softmax = SoftmaxLayer(axis=1)
+
+    data_in = np.array([[1,1,1,1],
+                        [2,2,2,3]])
+    loss = None
+    while not loss or loss > 1.001:
+        soft_in = new_layer.forward(data_in)
+        soft_out = softmax.forward(soft_in)
+        
+        soft_out_back = softmax.backward(2*soft_out)
+        new_layer.backward(soft_out_back)
+        soft_in = soft_in - soft_out_back * 0.5
+        print(soft_out)
+        print(np.sum(np.power(soft_out, 2)))
+        loss = np.sum(np.power(soft_out, 2))
 # test_forward_name()
 # test_set_get_weights()
 # test_backward_fc()
 
-test_softmax()
+test_fc_with_softmax()

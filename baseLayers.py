@@ -125,7 +125,7 @@ class FullyConnectedLayer(Layer):
         if not np.any(starting_weights_in):
             self.set_weights(starting_weights=np.ones(self.weights_shape))
         else:
-            self.set_weights(starting_weights=np.ones(self.weights_shape))
+            self.set_weights(starting_weights=starting_weights_in)
 
     '''
     set_learning_rate:
