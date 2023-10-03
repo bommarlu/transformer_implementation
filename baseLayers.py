@@ -1,5 +1,5 @@
 import numpy as np
-from logger import logger
+import logging
 from abc import ABC, abstractmethod
 
 '''The abstract layer class defines what must be implemented for a 'layer' to be valid within a ML model.
@@ -10,11 +10,11 @@ class Layer(ABC):
     
     @abstractmethod
     def forward(self):
-        logger.info(f'Running forward pass on {self.name}')
+        logging.debug(f'Running forward pass on {self.name}')
     
     @abstractmethod
     def backward(self):
-        logger.info(f'Running backward pass on {self.name}')
+        logging.debug(f'Running backward pass on {self.name}')
 
     #TODO: add shape function
 
@@ -60,7 +60,7 @@ class SoftmaxLayer(Layer):
     def backward(self, upstream_gradient):
         super().backward()
         gradient = ((1.0 / self.scale) * self.output * (1 - self.output)) * upstream_gradient
-        logger.info(f'Softmax gradient:\n{gradient}')
+        logging.debug(f'Softmax gradient:\n{gradient}')
         return gradient
 
 
@@ -115,7 +115,7 @@ class FullyConnectedLayer(Layer):
     Output:
     None
     '''
-    def __init__(self, num_input_nodes: int, num_output_nodes: int, name= 'layer_fc', starting_weights_in= None, learning_rate=0.01):
+    def __init__(self, num_input_nodes: int, num_output_nodes: int, name= 'layer_fc', starting_weights_in= None, learning_rate=0.001):
         super().__init__()
         self.name = name
         self.weights = None
@@ -123,7 +123,7 @@ class FullyConnectedLayer(Layer):
         # self.reLU = ReLULayer(name= (self.name + '_ReLU'))
         self.weights_shape = (num_input_nodes, num_output_nodes)
         if not np.any(starting_weights_in):
-            self.set_weights(starting_weights=np.ones(self.weights_shape))
+            self.set_weights(starting_weights=np.random.rand(*(self.weights_shape)))
         else:
             self.set_weights(starting_weights=starting_weights_in)
 
@@ -150,7 +150,7 @@ class FullyConnectedLayer(Layer):
     def set_weights(self, starting_weights):
         # Initialize weights
         if(starting_weights.shape != self.weights_shape):
-            logger.error('starting_weights does not match given input and output shape.')
+            logging.error('starting_weights does not match given input and output shape.')
             exit(1)
         self.weights = np.copy(starting_weights)
     
@@ -180,14 +180,14 @@ class FullyConnectedLayer(Layer):
     '''
     def forward(self, tokens_in):
         super().forward()
-        logger.info(f'input: \n{tokens_in}')
+        logging.debug(f'input: \n{tokens_in}')
         self.input = np.copy(tokens_in)
         if tokens_in.shape[-1] != self.weights.shape[0]:
-            logger.error(f"""input to {self.name} forward() call does not match weights shape.\n
+            logging.error(f"""input to {self.name} forward() call does not match weights shape.\n
                         weights shape: {self.weights.shape} input shape: {tokens_in.shape}""")
             exit(1)
         forward_result = tokens_in @ self.weights
-        logger.info(f'output: \n{forward_result}')
+        logging.debug(f'output: \n{forward_result}')
         return forward_result
         # return self.reLU.forward(forward_result)
 
@@ -214,14 +214,14 @@ class FullyConnectedLayer(Layer):
     def backward(self, upstream_gradient):
         super().backward()
         if not np.any(self.input):
-            logger.error(f"""backward pass called without running forwards pass first!""")
+            logging.error(f"""backward pass called without running forwards pass first!""")
             exit(1)
         
-        logger.info(f'upstream gradient:\n{upstream_gradient}')
+        logging.debug(f'upstream gradient:\n{upstream_gradient}')
         # reLU_gradient = self.reLU.backward(upstream_gradient)
         weight_gradients = self.input.T @ upstream_gradient
         input_gradients = upstream_gradient @ self.weights.T
-        logger.info(f'local weight_gradients:\n{weight_gradients}')
+        logging.debug(f'local weight_gradients:\n{weight_gradients}')
         
         self.weights -= self.learning_rate * weight_gradients
         return input_gradients
