@@ -49,6 +49,7 @@ class SoftmaxLayer(Layer):
         
     def forward(self, data_in):
         super().forward()
+        self.I = data_in.shape[0]
         scaled = np.divide(data_in, np.sqrt(self.scale))
         shifted = np.exp(scaled - np.max(scaled, axis=self.axis, keepdims=True))
         # Save a copy for the gradient
@@ -59,7 +60,22 @@ class SoftmaxLayer(Layer):
 
     def backward(self, upstream_gradient):
         super().backward()
-        gradient = ((1.0 / self.scale) * self.output * (1 - self.output)) * upstream_gradient
+        # Find the jacobian 
+
+        # The jacobian is diagonally symmetric
+        added_axis = self.output[:, np.newaxis]
+        num_cols = self.output.shape[1]
+        #TODO: investigate
+        #jacobian = np.repeat(added_axis, num_cols, axis=1)
+        jacob = np.repeat(added_axis, num_cols, axis=1)
+        jacob *= -1 * self.output.reshape(self.output.shape[0], self.output.shape[1], 1)
+        diagonals = (self.output * (1 - self.output))
+        jacob[:, np.arange(num_cols), np.arange(num_cols)] = diagonals
+
+
+        jacob *= (1.0 / self.scale)
+        # Find the gradient
+        gradient = (upstream_gradient[:, np.newaxis] @ jacob)[:,0,:]
         logging.debug(f'Softmax gradient:\n{gradient}')
         return gradient
 

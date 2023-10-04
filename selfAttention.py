@@ -1,5 +1,6 @@
 import numpy as np
 import logging
+import math
 from baseLayers import SoftmaxLayer, FullyConnectedLayer
 from baseLayers import *
 
@@ -14,17 +15,18 @@ from baseLayers import *
 
 '''Calculates attention matrix of size sequence_length_in * sequence_length_in'''
 class AttentionLayer(Layer):
-    def __init__(self, sequence_length_in: int, token_length_in: int, learning_rate=0.001, name='attention_layer'):
+    def __init__(self, sequence_length_in: int, token_length_in: int, token_length_out: int, learning_rate=0.001, name='attention_layer'):
         super().__init__()
         self.name=name
-        self.token_length = token_length_in
+        self.token_length_in = token_length_in
+        self.token_length_out = token_length_out # For multiple heads, this is a divisor of token_length in, otherwise 1
         self.sequence_length = sequence_length_in 
         self.attention_shape = (self.sequence_length, self.sequence_length)
 
-        self.query_layer = FullyConnectedLayer(num_output_nodes=self.token_length, num_input_nodes=self.token_length, name='query_layer', learning_rate=learning_rate)
-        self.key_layer = FullyConnectedLayer(num_output_nodes=self.token_length, num_input_nodes=self.token_length, name='key_layer', learning_rate=learning_rate)
+        self.query_layer = FullyConnectedLayer(num_output_nodes=self.token_length_out, num_input_nodes=self.token_length_in, name='query_layer', learning_rate=learning_rate)
+        self.key_layer = FullyConnectedLayer(num_output_nodes=self.token_length_out, num_input_nodes=self.token_length_in, name='key_layer', learning_rate=learning_rate)
         self.attention = None
-        self.softmax_layer = SoftmaxLayer(name='attention_softmax_layer', axis=1, scale=np.sqrt(token_length_in))
+        self.softmax_layer = SoftmaxLayer(name='attention_softmax_layer', axis=1, scale=np.sqrt(token_length_out))
     
     def set_key_weights(self, key_weights):
         self.key_layer.set_weights(key_weights)
@@ -39,14 +41,17 @@ class AttentionLayer(Layer):
     def forward(self, tokens_in: np.array):
         super().forward()
         logging.debug(f'Query Weights:\n{self.query_layer.get_weights()}')
-        logging.debug(f'Key Weights:\n{self.query_layer.get_weights()}')
+        logging.debug(f'Key Weights:\n{self.key_layer.get_weights()}')
+
         self.queryMatrix = self.query_layer.forward(tokens_in=tokens_in)
         self.keyMatrix = self.key_layer.forward(tokens_in=tokens_in)
-        logging.debug(f'Calculating attention matrix of shape {self.attention_shape}')
+
         pre_softmax = self.queryMatrix @ self.keyMatrix.T
-        logging.debug(f'Attention matrix:\n{pre_softmax}')
+        logging.debug(f'Attention matrix, pre softmax:\n{pre_softmax}')
+
         self.attention = self.softmax_layer.forward(data_in=pre_softmax)
-        logging.debug(f'Attention:\n{self.attention}')
+        logging.debug(f'Attention matrix:\n{self.attention}')
+
         return np.copy(self.attention)
     
     def backward(self, upstream_grad: float):
@@ -57,19 +62,23 @@ class AttentionLayer(Layer):
         return self.query_layer.backward(query_grad), self.key_layer.backward(key_grad)
         
 class SelfAttentionHead(Layer):
-    def __init__(self, sequence_length_in: int, token_length_in: int, name='attention_head'):
+    def __init__(self, sequence_length_in: int, token_length_in: int, token_length_out: int, learning_rate=0.001, name='attention_head'):
         super().__init__()
         self.name='attention_head'
-        self.token_length = token_length_in
+        self.token_length_in = token_length_in
+        self.token_length_out = token_length_out
         self.sequence_length = sequence_length_in 
 
-        self.attention_layer = AttentionLayer(sequence_length_in=sequence_length_in, token_length_in=token_length_in, name='attention_layer')
-        self.value_layer = FullyConnectedLayer(num_output_nodes=self.token_length, num_input_nodes=self.token_length, name='value_layer')
+        self.attention_layer = AttentionLayer(sequence_length_in=sequence_length_in, 
+                                            token_length_in=token_length_in, 
+                                            token_length_out= token_length_out, 
+                                            name='attention_layer')
+        self.value_layer = FullyConnectedLayer(num_output_nodes=self.token_length_out, num_input_nodes=self.token_length_in, name='value_layer')
 
     def forward(self, tokens_in: np.array):
-        values = self.value_layer.forward(tokens_in=tokens_in)
-        attention = self.attention_layer.forward(tokens_in=tokens_in)
-        result = attention @ values
+        self.values = self.value_layer.forward(tokens_in=tokens_in)
+        self.attention = self.attention_layer.forward(tokens_in=tokens_in)
+        result = self.attention @ self.values
         return result
     
     def set_value_weights(self, value_weights):
@@ -85,14 +94,33 @@ class SelfAttentionHead(Layer):
     def get_query_weights(self):
         return self.attention_layer.get_value_weights()
 
-    def backward(self, loss: float):
-        super.backward()
+    def backward(self, upstream_gradient: float):
+        super().backward()
+        self.value_layer.backward(self.attention.T @ upstream_gradient)
+        self.attention_layer.backward(self.values @ upstream_gradient.T)
 
-# # Typically dIn is defaulted to sequence_length / h
-# class MultiHeadSelfAttention:
-#     def __init__(self, sequence_length_in: int, token_length_in: int, number_of_heads: int):
-#         self.heads = np.array([], dtype=SelfAttentionHead)
-#         for _ in range(number_of_heads):
-#             self.heads = np.append(self.heads, SelfAttentionHead(sequence_length_in, (token_length_in/number_of_heads)))
-#         print(self.heads)
+# Typically dIn is defaulted to sequence_length / h
+class MultiHeadSelfAttention:
+    # TODO: Create single matrix implementation for multiple heads
+    def __init__(self, sequence_length_in: int, token_length_in: int, number_of_heads: int):
+        if token_length_in % number_of_heads:
+            logging.error(f"number of heads must divide the token length perfectly. \nnum_heads: {number_of_heads}\n token_length: {token_length_in}")
+            exit(2)
+        self.heads = np.array([], dtype=SelfAttentionHead)
+        # Fully connected layer which operates on concatenated output of heads
+        self.concatenator = FullyConnectedLayer(token_length_in, token_length_in)
+        self.token_length_in = token_length_in
+        self.token_length_out = int(token_length_in/number_of_heads)
+        for i in range(number_of_heads):
+            current_head = SelfAttentionHead(sequence_length_in=sequence_length_in, 
+                                            token_length_in=token_length_in, 
+                                            token_length_out=self.token_length_out,
+                                            name=f'sa_layer_{i}')
+            self.heads = np.append(self.heads, current_head)
         
+
+    def forward(self, tokens_in: np.array):
+        self.out = np.array([])
+        for head in self.heads:
+            self.out = np.concatenate(self.out, head.forward(tokens_in), axis=1)
+                
