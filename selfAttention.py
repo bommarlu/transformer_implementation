@@ -72,15 +72,26 @@ class SelfAttentionHead(Layer):
         self.attention_layer = AttentionLayer(sequence_length_in=sequence_length_in, 
                                             token_length_in=token_length_in, 
                                             token_length_out= token_length_out, 
+                                            learning_rate=learning_rate,
                                             name='attention_layer')
-        self.value_layer = FullyConnectedLayer(num_output_nodes=self.token_length_out, num_input_nodes=self.token_length_in, name='value_layer')
+        self.value_layer = FullyConnectedLayer(num_output_nodes=self.token_length_out, 
+                                            num_input_nodes=self.token_length_in, 
+                                            learning_rate=learning_rate, 
+                                            name='value_layer')
 
     def forward(self, tokens_in: np.array):
+        super().forward()
         self.values = self.value_layer.forward(tokens_in=tokens_in)
         self.attention = self.attention_layer.forward(tokens_in=tokens_in)
         result = self.attention @ self.values
         return result
     
+    def backward(self, upstream_gradient: float):
+        super().backward()
+        value_grads = self.value_layer.backward(self.attention.T @ upstream_gradient)
+        attention_grads = self.attention_layer.backward(self.values @ upstream_gradient.T)
+        return value_grads, attention_grads
+
     def set_value_weights(self, value_weights):
         self.value_layer.set_weights(value_weights)
     def set_key_weights(self, key_weights):
@@ -94,33 +105,43 @@ class SelfAttentionHead(Layer):
     def get_query_weights(self):
         return self.attention_layer.get_value_weights()
 
-    def backward(self, upstream_gradient: float):
-        super().backward()
-        self.value_layer.backward(self.attention.T @ upstream_gradient)
-        self.attention_layer.backward(self.values @ upstream_gradient.T)
+
 
 # Typically dIn is defaulted to sequence_length / h
-class MultiHeadSelfAttention:
+class MultiHeadSelfAttention(Layer):
     # TODO: Create single matrix implementation for multiple heads
-    def __init__(self, sequence_length_in: int, token_length_in: int, number_of_heads: int):
+    def __init__(self, sequence_length_in: int, token_length_in: int, number_of_heads: int, learning_rate=0.01, name='multi_head_layer'):
         if token_length_in % number_of_heads:
             logging.error(f"number of heads must divide the token length perfectly. \nnum_heads: {number_of_heads}\n token_length: {token_length_in}")
             exit(2)
-        self.heads = np.array([], dtype=SelfAttentionHead)
+        self.heads = []
+        self.name = name
         # Fully connected layer which operates on concatenated output of heads
-        self.concatenator = FullyConnectedLayer(token_length_in, token_length_in)
+        self.concatenator = FullyConnectedLayer(token_length_in, token_length_in, learning_rate=learning_rate)
         self.token_length_in = token_length_in
         self.token_length_out = int(token_length_in/number_of_heads)
         for i in range(number_of_heads):
             current_head = SelfAttentionHead(sequence_length_in=sequence_length_in, 
                                             token_length_in=token_length_in, 
                                             token_length_out=self.token_length_out,
-                                            name=f'sa_layer_{i}')
-            self.heads = np.append(self.heads, current_head)
+                                            learning_rate=learning_rate,
+                                            name=f'{self.name}_sa_layer_{i}')
+            self.heads.append(current_head)
         
 
     def forward(self, tokens_in: np.array):
-        self.out = np.array([])
+        super().forward()
+        outputs = []
         for head in self.heads:
-            self.out = np.concatenate(self.out, head.forward(tokens_in), axis=1)
+            outputs.append(head.forward(tokens_in))
+        return self.concatenator.forward(np.concatenate(outputs, axis=1))
                 
+
+    def backward(self, upstream_grad):
+        super().backward()
+        backwards_grad = self.concatenator.backward(upstream_gradient=upstream_grad)
+        sections = np.split(backwards_grad, len(self.heads), axis=1)
+        for idx, head in enumerate(self.heads):
+            head.backward(sections[idx])
+
+

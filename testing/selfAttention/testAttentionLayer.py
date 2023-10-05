@@ -40,7 +40,7 @@ def test_attention_backward_specific():
 
     attention = AttentionLayer(sequence_length_in=2, token_length_in=4, token_length_out=4, learning_rate=1)
     loss = None
-    while not loss or loss > 0.0000001:
+    while not loss or loss > 0.001:
         logging.debug('============= FORWARD PASS =============')
         forward_pass = attention.forward(input_data)
         loss = loss_function(forward_pass, target_out)

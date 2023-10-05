@@ -35,7 +35,7 @@ def test_backward_fc():
     weights = np.array([[1, 1, 1, 1],
                         [1, 1, 1, 1],
                         [1, 1, 1, 1],]).T
-    new_layer = FullyConnectedLayer(4, 3, starting_weights_in=weights)
+    new_layer = FullyConnectedLayer(4, 3, starting_weights_in=weights, learning_rate=10)
     new_layer.forward(np.array([[1,1,1,1],
                                 [2,2,2,3]]))
     upstream_gradient = np.array([[-1,-2,-3],
@@ -93,8 +93,46 @@ def test_fc_with_softmax_random_weights():
         print(soft_out)
         print(np.sum(np.power(soft_out, 2)))
         loss = np.sum(np.power(soft_out, 2))
-# test_forward_name()
+
+def test_layernorm():
+    data_in = np.array([[1,1,1,1],
+                        [2,2,2,3]])
+    layernorm = LayerNorm()
+    print(layernorm.forward(data_in))
+    print((data_in - np.mean(data_in)) / (np.std(data_in) + 0.000001))
+
+
+
+def test_layernorm_backwards():
+    data_in = np.array([[1,1,1,1],
+                        [2,2,2,100]]).astype(np.float64)
+    loss = None
+    lr = 0.01
+    layernorm = LayerNorm(learning_rate=lr)
+    while not loss or loss > 0.001:
+        output = layernorm.forward(data_in)
+        loss = np.sum(np.power(output, 2))
+        data_in -= layernorm.backward(2*output) * lr
+        print(loss)
+        print(layernorm.forward(data_in))
+        print(f'input_data:\n{data_in}')
+
+def test_layernorm_numerical_backwards():
+    data_in = np.array([[1,1,1,1],
+                        [2,2,2,3]])
+    perturbed = data_in + 0.01
+
+    layernorm = LayerNorm()
+    original_forward = layernorm.forward(data_in)
+    perturbed_forward = layernorm.forward(perturbed)
+
+    grads = layernorm.backward(original_forward)
+    print((1 + grads) * original_forward)
+    print(perturbed_forward)
 # test_set_get_weights()
 # test_backward_fc()
-test_softmax()
-#test_fc_with_softmax_random_data()
+# test_softmax()
+# test_fc_with_softmax_random_data()
+
+# test_layernorm()
+test_layernorm_numerical_backwards()

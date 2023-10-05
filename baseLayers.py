@@ -241,3 +241,59 @@ class FullyConnectedLayer(Layer):
         
         self.weights -= self.learning_rate * weight_gradients
         return input_gradients
+
+
+
+class LayerNorm(Layer):
+    def __init__(self, learning_rate=0.01, name='layernorm_layer'):
+        self.name = name
+        self.eps = 0.001
+        self.beta = 0
+        self.gamma = 1
+        self.learning_rate = 0.01
+    
+    def forward(self, input_data):
+        super().forward()
+        self.input = input_data
+        self.N = np.size(input_data)
+        self.mu = 1. / self.N * np.sum(input_data)
+        self.xmu = input_data - self.mu
+        self.xmu_sq = np.power(self.xmu, 2)
+        self.variance = 1./self.N * np.sum(self.xmu_sq)
+        self.sqrt_var = np.sqrt(self.variance + self.eps)
+        self.inverted_variance = 1. / self.sqrt_var
+        self.normalized = self.xmu * self.inverted_variance
+        self.gammax = self.gamma * self.normalized
+        self.out = self.gammax + self.beta
+        return self.out
+    
+    # Trying to calculate the LayerNorm gradient by hand was a horrible idea. so lets do it using a computational graph approach.
+    # Adapted from: https://kratzert.github.io/2016/02/12/understanding-the-gradient-flow-through-the-batch-normalization-layer.html
+    def backward(self, upstream_grad):
+        super().backward()
+        d_beta = upstream_grad * np.sum(self.gammax)
+        self.beta -= d_beta * self.learning_rate
+
+        d_gammax = upstream_grad
+        d_gamma = np.sum(self.normalized * d_gammax)
+        self.gamma -= d_gamma * self.learning_rate
+
+        d_normalized = self.gamma * d_gamma
+
+        d_inverted_variance = np.sum(self.xmu * d_normalized)
+        d_xmu = self.inverted_variance * d_normalized
+
+        d_sqrt_var = -1./(self.sqrt_var ** 2) * d_inverted_variance
+
+        d_variance = (0.5 * 1./self.sqrt_var) * d_sqrt_var
+        
+        d_xmu_sq = 1./self.N * np.ones(upstream_grad.shape) * d_variance
+
+        d_xmu = 2.*self.xmu * d_xmu_sq
+
+        d_mu = -1. * d_xmu
+
+        d_input_data = 1. / self.N * d_mu
+
+        return d_input_data
+        
