@@ -2,13 +2,13 @@ import sys
 sys.path.append('/home/bommarlu/projects/attention-is-all-you-need/')
 from attention import AttentionLayer, SelfAttentionHead
 import logging
-import numpy as np
+import cupy
 
 def test_attention_backward():
     logging.basicConfig(level=logging.DEBUG)
     def loss_function(output):
-        return np.sum(np.power(output, 2))
-    input_data = np.random.rand(2,4)
+        return cupy.sum(cupy.power(output, 2))
+    input_data = cupy.random.rand(2,4)
     attention = AttentionLayer(sequence_length_in=2, token_length_in=4, token_length_out=4, learning_rate=0.001)
     loss = None
     while not loss or loss > 1.00001:
@@ -33,12 +33,12 @@ def test_attention_backward_specific():
     sl = 3
     tl = 4
     def loss_function(output, correct):
-        return np.sum(np.power(output - correct, 2))
-    input_data = np.random.rand(sl,tl)
+        return cupy.sum(cupy.power(output - correct, 2))
+    input_data = cupy.random.rand(sl,tl)
 
     #calculate an output matrix
-    random_out = np.random.rand(sl,sl)
-    target_out = random_out / np.sum(random_out, axis = 1, keepdims=True)
+    random_out = cupy.random.rand(sl,sl)
+    target_out = random_out / cupy.sum(random_out, axis = 1, keepdims=True)
 
     attention = AttentionLayer(sequence_length_in=sl, token_length_in=tl, token_length_out=tl, learning_rate=1)
     initial_forward = attention.forward(input_data)
@@ -67,12 +67,12 @@ def test_attention_backward_specific_2layer():
     sl = 3
     tl = 4
     def loss_function(output, correct):
-        return np.sum(np.power(output - correct, 2))
-    input_data = np.random.rand(sl,tl)
+        return cupy.sum(cupy.power(output - correct, 2))
+    input_data = cupy.random.rand(sl,tl)
 
     #calculate an output matrix
-    random_out = np.random.rand(sl,sl)
-    target_out = random_out / np.sum(random_out, axis = 1, keepdims=True)
+    random_out = cupy.random.rand(sl,sl)
+    target_out = random_out / cupy.sum(random_out, axis = 1, keepdims=True)
 
     attention = AttentionLayer(sequence_length_in=sl, token_length_in=tl, token_length_out=tl, learning_rate=1)
     attention2 = AttentionLayer(sequence_length_in=sl, token_length_in=sl, token_length_out=sl, learning_rate=1)

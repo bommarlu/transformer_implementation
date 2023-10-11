@@ -1,4 +1,4 @@
-from selfattention import MultiHeadSelfAttention
+from attention import MultiHeadSelfAttention
 from fullyconnected import FullyConnected2Layer
 from baselayers import LayerNorm, Layer
 
@@ -24,5 +24,4 @@ class transformer(Layer):
         residual = multi_head_out + residual
 
         fc_out = self.fc.forward(layernorm2_out)
-
         return fc_out + residual

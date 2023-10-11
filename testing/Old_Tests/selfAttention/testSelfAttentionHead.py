@@ -3,17 +3,17 @@ sys.path.append('/home/bommarlu/projects/attention-is-all-you-need/')
 from attention import AttentionLayer, SelfAttentionHead
 import logging
 import copy
-import numpy as np
+import cupy
 
 def test_sa_backward():
     logging.basicConfig(level=logging.INFO)
     def loss_function(output, correct):
-        return np.sum(np.power(output - correct, 2))
-    input_data = np.random.rand(2,4)
+        return cupy.sum(cupy.power(output - correct, 2))
+    input_data = cupy.random.rand(2,4)
 
     #calculate an output matrix
-    random_out = np.random.rand(2,4)
-    target_out = random_out / np.sum(random_out, axis = 1, keepdims=True)
+    random_out = cupy.random.rand(2,4)
+    target_out = random_out / cupy.sum(random_out, axis = 1, keepdims=True)
     target_out *= 10
 
     attention = SelfAttentionHead(sequence_length_in=2, token_length_in=4, token_length_out=4, learning_rate=0.1)
@@ -38,11 +38,11 @@ def test_sa_backward():
 def test_multi_sa_backward():
     logging.basicConfig(level=logging.INFO)
     def loss_function(output, correct):
-        return np.sum(np.power(output - correct, 2))
-    input_data = np.random.rand(2,4)
+        return cupy.sum(cupy.power(output - correct, 2))
+    input_data = cupy.random.rand(2,4)
 
     #calculate an output matrix
-    random_out = np.random.rand(2,4)
+    random_out = cupy.random.rand(2,4)
     target_out = random_out
     
     attention = SelfAttentionHead(sequence_length_in=2, token_length_in=4, token_length_out=4, learning_rate=0.001)
@@ -70,7 +70,7 @@ def test_multi_sa_backward():
 
 
 def test_sa_backward_numerical():
-    data_in = np.array([[1,1,1,1],
+    data_in = cupy.array([[1,1,1,1],
                         [2,2,2,3]])
     perturbed_up = data_in + 0.1
     perturbed_down = data_in - 0.1
@@ -81,7 +81,7 @@ def test_sa_backward_numerical():
     perturbed_up_forward = copy.deepcopy(layer).forward(perturbed_up)
     perturbed_down_forward = copy.deepcopy(layer).forward(perturbed_down)
 
-    grads = layer.backward(np.ones((2,4)))
+    grads = layer.backward(cupy.ones((2,4)))
     print(grads)
     print((perturbed_up_forward - perturbed_down_forward) / 0.2)
 

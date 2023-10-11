@@ -1,4 +1,5 @@
 import numpy as np
+import cupy
 import logging
 from abc import ABC, abstractmethod
 
@@ -28,13 +29,13 @@ class ReLULayer(Layer):
             
     def forward(self, data_in):
         super().forward()
-        self.input = np.copy(data_in)
-        out = np.copy(self.input)
+        self.input = cupy.copy(data_in)
+        out = cupy.copy(self.input)
         out[out < 0] = 0
         return out
     def backward(self, upstream_gradient):
         super().backward()
-        return (self.input > 0).astype(np.float64) * upstream_gradient
+        return (self.input > 0).astype(cupy.float64) * upstream_gradient
     
 
 '''Calculates softmax across the given axis'''
@@ -50,11 +51,11 @@ class SoftmaxLayer(Layer):
     def forward(self, data_in):
         super().forward()
         self.I = data_in.shape[0]
-        scaled = np.divide(data_in, np.sqrt(self.scale))
-        shifted = np.exp(scaled - np.max(scaled, axis=self.axis, keepdims=True))
+        scaled = cupy.divide(data_in, cupy.sqrt(self.scale))
+        shifted = cupy.exp(scaled - cupy.max(scaled, axis=self.axis, keepdims=True))
         # Save a copy for the gradient
-        softmax = np.divide(shifted, np.sum(shifted, axis=self.axis, keepdims=True))
-        self.output = np.copy(softmax)
+        softmax = cupy.divide(shifted, cupy.sum(shifted, axis=self.axis, keepdims=True))
+        self.output = cupy.copy(softmax)
         return softmax
 
 
@@ -63,19 +64,19 @@ class SoftmaxLayer(Layer):
         # Find the jacobian 
 
         # The jacobian is diagonally symmetric
-        added_axis = self.output[:, np.newaxis]
+        added_axis = self.output[:, cupy.newaxis]
         num_cols = self.output.shape[1]
         #TODO: investigate
-        #jacobian = np.repeat(added_axis, num_cols, axis=1)
-        jacobian_matrix = np.repeat(added_axis, num_cols, axis=1)
+        #jacobian = cupy.repeat(added_axis, num_cols, axis=1)
+        jacobian_matrix = cupy.repeat(added_axis, num_cols, axis=1)
         jacobian_matrix *= -1 * self.output.reshape(self.output.shape[0], self.output.shape[1], 1)
         diagonals = (self.output * (1 - self.output))
-        jacobian_matrix[:, np.arange(num_cols), np.arange(num_cols)] = diagonals
+        jacobian_matrix[:, cupy.arange(num_cols), cupy.arange(num_cols)] = diagonals
 
 
         jacobian_matrix *= (1.0 / self.scale)
         # Find the gradient
-        gradient = np.sum(upstream_gradient[:, np.newaxis, :] * jacobian_matrix, axis=2)
+        gradient = cupy.sum(upstream_gradient[:, cupy.newaxis, :] * jacobian_matrix, axis=2)
         logging.debug(f'Softmax gradient:\n{gradient}')
         return gradient
 
@@ -89,20 +90,20 @@ class SoftmaxClasses(Layer):
     
     def get_softmax(self, input_data):
         self.input = input_data
-        m = np.max(input_data, axis=1, keepdims=True)
-        self.softmax = np.exp(input_data-m) / np.sum(np.exp(input_data-m), axis=1, keepdims=True)
+        m = cupy.max(input_data, axis=1, keepdims=True)
+        self.softmax = cupy.exp(input_data-m) / cupy.sum(cupy.exp(input_data-m), axis=1, keepdims=True)
         return self.softmax
     
     def forward(self, input_data, ground_truth):
         super().forward()
         s = self.get_softmax(input_data)
-        s_correct = s[np.arange(len(input_data)), ground_truth].reshape((len(input_data),1))
-        return (-1.0/len(input_data)) * np.sum(np.log(s_correct))
+        s_correct = s[cupy.arange(len(input_data)), ground_truth].reshape((len(input_data),1))
+        return (-1.0/len(input_data)) * cupy.sum(cupy.log(s_correct))
     
     def backward(self, ground_truth):
         super().backward()
-        y_one_hot = np.zeros(self.input.shape) 
-        y_one_hot[np.arange(len(self.input)), ground_truth]= 1
+        y_one_hot = cupy.zeros(self.input.shape) 
+        y_one_hot[cupy.arange(len(self.input)), ground_truth]= 1
         return (1.0/len(self.input))*(self.softmax - y_one_hot)
 
 
@@ -124,7 +125,7 @@ class FullyConnectedLayer(Layer):
         Modifies:
         Sets self.name to name
         Sets self.weights_shape to (num_input_nodes, num_output_nodes)
-        Sets self.weights to starting_weights if specified, or to np.ones(self.weights_shape) otherwise.
+        Sets self.weights to starting_weights if specified, or to cupy.ones(self.weights_shape) otherwise.
 
         Output:
         None
@@ -135,8 +136,8 @@ class FullyConnectedLayer(Layer):
         self.set_learning_rate(learning_rate)
         # self.reLU = ReLULayer(name= (self.name + '_ReLU'))
         self.weights_shape = (num_input_nodes, num_output_nodes)
-        if not np.any(starting_weights_in):
-            self.set_weights(starting_weights=np.random.rand(*(self.weights_shape)))
+        if not cupy.any(starting_weights_in):
+            self.set_weights(starting_weights=cupy.random.rand(*(self.weights_shape)))
         else:
             self.set_weights(starting_weights=starting_weights_in)
 
@@ -165,7 +166,7 @@ class FullyConnectedLayer(Layer):
         if(starting_weights.shape != self.weights_shape):
             logging.error('starting_weights does not match given input and output shape.')
             exit(1)
-        self.weights = np.copy(starting_weights)
+        self.weights = cupy.copy(starting_weights)
     
 
     def get_weights(self):
@@ -173,7 +174,7 @@ class FullyConnectedLayer(Layer):
         Output:
         Returns a copy of the weights matrix.
         '''
-        return np.copy(self.weights)
+        return cupy.copy(self.weights)
     
 
     def forward(self, tokens_in):
@@ -193,7 +194,7 @@ class FullyConnectedLayer(Layer):
         '''
         super().forward()
         logging.debug(f'input: \n{tokens_in}')
-        self.input = np.copy(tokens_in)
+        self.input = cupy.copy(tokens_in)
         if tokens_in.shape[-1] != self.weights.shape[0]:
             logging.error(f"""input to {self.name} forward() call does not match weights shape.\n
                         weights shape: {self.weights.shape} input shape: {tokens_in.shape}""")
@@ -222,7 +223,7 @@ class FullyConnectedLayer(Layer):
         Resulting gradient should be the same shape as self.weights_shape
         '''
         super().backward()
-        if not np.any(self.input):
+        if not cupy.any(self.input):
             logging.error(f"""backward pass called without running forwards pass first!""")
             exit(1)
         
@@ -249,12 +250,12 @@ class LayerNorm(Layer):
     def forward(self, input_data):
         super().forward()
         self.input = input_data
-        self.N = np.size(input_data)
-        self.mu = 1. / self.N * np.sum(input_data)
+        self.N = cupy.size(input_data)
+        self.mu = 1. / self.N * cupy.sum(input_data)
         self.xmu = input_data - self.mu
-        self.xmu_sq = np.power(self.xmu, 2)
-        self.variance = 1./self.N * np.sum(self.xmu_sq)
-        self.sqrt_var = np.sqrt(self.variance + self.eps)
+        self.xmu_sq = cupy.power(self.xmu, 2)
+        self.variance = 1./self.N * cupy.sum(self.xmu_sq)
+        self.sqrt_var = cupy.sqrt(self.variance + self.eps)
         self.inverted_variance = 1. / self.sqrt_var
         self.normalized = self.xmu * self.inverted_variance
         self.gammax = self.gamma * self.normalized
@@ -265,23 +266,23 @@ class LayerNorm(Layer):
     # Adapted from: https://kratzert.github.io/2016/02/12/understanding-the-gradient-flow-through-the-batch-normalization-layer.html
     def backward(self, upstream_grad):
         super().backward()
-        d_beta = upstream_grad * np.sum(self.gammax)
+        d_beta = upstream_grad * cupy.sum(self.gammax)
         self.beta -= d_beta * self.learning_rate
 
         d_gammax = upstream_grad
-        d_gamma = np.sum(self.normalized * d_gammax)
+        d_gamma = cupy.sum(self.normalized * d_gammax)
         self.gamma -= d_gamma * self.learning_rate
 
         d_normalized = self.gamma * d_gamma
 
-        d_inverted_variance = np.sum(self.xmu * d_normalized)
+        d_inverted_variance = cupy.sum(self.xmu * d_normalized)
         d_xmu = self.inverted_variance * d_normalized
 
         d_sqrt_var = -1./(self.sqrt_var ** 2) * d_inverted_variance
 
         d_variance = (0.5 * 1./self.sqrt_var) * d_sqrt_var
         
-        d_xmu_sq = 1./self.N * np.ones(upstream_grad.shape) * d_variance
+        d_xmu_sq = 1./self.N * cupy.ones(upstream_grad.shape) * d_variance
 
         d_xmu = 2.*self.xmu * d_xmu_sq
 

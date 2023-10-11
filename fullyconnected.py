@@ -1,4 +1,4 @@
-import numpy as np
+import cupy
 import logging
 import math
 from baselayers import SoftmaxClasses, FullyConnectedLayer, ReLULayer
@@ -20,8 +20,8 @@ class FullyConnected2Layer(Layer):
     
     def forward(self, data_in):
         super().forward()
-        self.input = np.append(data_in, np.ones(data_in.shape[0]), axis=1)
-        out_fc1 = np.append(self.fc_1.forward(self.input), np.ones(self.hidden_layer_size + 1), axis=1)
+        self.input = cupy.append(data_in, cupy.ones(data_in.shape[0]), axis=1)
+        out_fc1 = cupy.append(self.fc_1.forward(self.input), cupy.ones(self.hidden_layer_size + 1), axis=1)
         self.relu_1.forward(out_fc1)
         out_fc2 = self.fc_2.forward(data_in)
         relu2 = self.relu_2.forward(out_fc2)

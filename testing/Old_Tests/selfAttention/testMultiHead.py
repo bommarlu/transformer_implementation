@@ -1,18 +1,18 @@
 import sys
 sys.path.append('/home/bommarlu/projects/attention-is-all-you-need/')
-from selfattention import MultiHeadSelfAttention
+from attention import MultiHeadSelfAttention
 import logging
-import numpy as np
+import cupy
 
 def test_sa_backward():
     logging.basicConfig(level=logging.INFO)
     def loss_function(output, correct):
-        return np.sum(np.power(output - correct, 2))
-    input_data = np.random.rand(4,4)
+        return cupy.sum(cupy.power(output - correct, 2))
+    input_data = cupy.random.rand(4,4)
 
     #calculate an output matrix
-    random_out = np.random.rand(4,4)
-    target_out = random_out / np.sum(random_out, axis = 1, keepdims=True)
+    random_out = cupy.random.rand(4,4)
+    target_out = random_out / cupy.sum(random_out, axis = 1, keepdims=True)
     attention = MultiHeadSelfAttention(sequence_length_in=4, token_length_in=4, number_of_heads=4, learning_rate=0.001)
     loss = None
     while not loss or loss > 0.001:
