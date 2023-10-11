@@ -1,16 +1,22 @@
-from selfattention import MultiHeadSelfAttention
+from attention import MultiHeadSelfAttention
+from baselayers import Layer, LayerNorm
 from fullyconnected import FullyConnected2Layer
-from baselayers import LayerNorm, Layer
+
 
 class transformer(Layer):
     def __init__(self, sequence_length, learning_rate=0.01):
         super().__init__()
         self.input = None
-        self.layernorm1 = LayerNorm(name='pre_sa_layernorm_layer', learning_rate=learning_rate)
-        self.multi_head = MultiHeadSelfAttention(sequence_length_in=sequence_length, learning_rate=learning_rate)
-        self.layernorm2 = LayerNorm(name='pre_fc_layernorm_layer', learning_rate=learning_rate)
+        self.layernorm1 = LayerNorm(
+            name="pre_sa_layernorm_layer", learning_rate=learning_rate
+        )
+        self.multi_head = MultiHeadSelfAttention(
+            sequence_length_in=sequence_length, learning_rate=learning_rate
+        )
+        self.layernorm2 = LayerNorm(
+            name="pre_fc_layernorm_layer", learning_rate=learning_rate
+        )
         self.fc = FullyConnected2Layer()
-
 
     def forward(self, sequence_in):
         super().forward()
