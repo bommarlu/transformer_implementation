@@ -1,4 +1,4 @@
-import selfAttention as sa
+import selfattention as sa
 import numpy as np
 
 # def test_self_attention_head():

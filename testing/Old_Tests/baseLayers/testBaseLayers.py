@@ -1,7 +1,7 @@
 import sys
 import logging
 sys.path.append('/home/bommarlu/projects/attention-is-all-you-need/')
-from baseLayers import *
+from baselayers import *
 
 
 def print_weights(network):
@@ -58,13 +58,13 @@ def test_softmax():
         print(np.sum(np.power(soft_out, 2)))
 
 def test_fc_with_softmax_random_data():
-    new_layer = FullyConnectedLayer(4, 2, learning_rate=1)
+    new_layer = FullyConnectedLayer(15, 25, learning_rate=1)
 
     softmax = SoftmaxLayer(axis=1)
 
-    data_in = np.random.rand(2, 4)
+    data_in = np.random.rand(20, 15)
     loss = None
-    while not loss or loss > 1:
+    while not loss or loss > 0.001:
         soft_in = new_layer.forward(data_in)
         soft_out = softmax.forward(soft_in)
         
@@ -132,7 +132,7 @@ def test_layernorm_numerical_backwards():
 # test_set_get_weights()
 # test_backward_fc()
 # test_softmax()
-# test_fc_with_softmax_random_data()
+test_softmax()
 
 # test_layernorm()
-test_layernorm_numerical_backwards()
+# test_layernorm_numerical_backwards()

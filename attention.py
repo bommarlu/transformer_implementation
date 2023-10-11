@@ -1,8 +1,8 @@
 import numpy as np
 import logging
 import math
-from baseLayers import SoftmaxLayer, FullyConnectedLayer
-from baseLayers import *
+from baselayers import SoftmaxLayer, FullyConnectedLayer
+from baselayers import *
 
 # def softmax(x: np.array):
 #     raised = np.exp(x - np.max(x, axis=1, keepdims=True))
@@ -54,12 +54,12 @@ class AttentionLayer(Layer):
 
         return np.copy(self.attention)
     
-    def backward(self, upstream_grad: float):
+    def backward(self, upstream_grad, update_weights=True):
         super().backward()
-        softmax_grad = self.softmax_layer.backward(upstream_grad)
-        query_grad = softmax_grad @ self.keyMatrix
-        key_grad = softmax_grad.T @ self.queryMatrix
-        return self.query_layer.backward(query_grad), self.key_layer.backward(key_grad)
+        self.softmax_grad = self.softmax_layer.backward(upstream_grad)
+        self.query_grad = self.softmax_grad @ self.keyMatrix
+        self.key_grad = self.softmax_grad.T @ self.queryMatrix
+        return self.query_layer.backward(self.query_grad, update_weights) + self.key_layer.backward(self.key_grad, update_weights)
         
 class SelfAttentionHead(Layer):
     def __init__(self, sequence_length_in: int, token_length_in: int, token_length_out: int, learning_rate=0.001, name='attention_head'):
@@ -88,9 +88,9 @@ class SelfAttentionHead(Layer):
     
     def backward(self, upstream_gradient: float):
         super().backward()
-        value_grads = self.value_layer.backward(self.attention.T @ upstream_gradient)
-        attention_grads = self.attention_layer.backward(self.values @ upstream_gradient.T)
-        return value_grads, attention_grads
+        value_grad = self.value_layer.backward(self.attention.T @ upstream_gradient)
+        attention_grad = self.attention_layer.backward(self.values @ upstream_gradient.T)
+        return value_grad + attention_grad
 
     def set_value_weights(self, value_weights):
         self.value_layer.set_weights(value_weights)
@@ -141,6 +141,7 @@ class MultiHeadSelfAttention(Layer):
         super().backward()
         backwards_grad = self.concatenator.backward(upstream_gradient=upstream_grad)
         sections = np.split(backwards_grad, len(self.heads), axis=1)
+        input_grads = []
         for idx, head in enumerate(self.heads):
             head.backward(sections[idx])
 

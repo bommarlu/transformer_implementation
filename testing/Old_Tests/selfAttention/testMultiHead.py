@@ -1,20 +1,19 @@
 import sys
 sys.path.append('/home/bommarlu/projects/attention-is-all-you-need/')
-from selfAttention import AttentionLayer, SelfAttentionHead
+from selfattention import MultiHeadSelfAttention
 import logging
 import numpy as np
 
-def test_sa_bacward():
+def test_sa_backward():
     logging.basicConfig(level=logging.INFO)
     def loss_function(output, correct):
         return np.sum(np.power(output - correct, 2))
-    input_data = np.random.rand(2,4)
+    input_data = np.random.rand(4,4)
 
     #calculate an output matrix
-    random_out = np.random.rand(2,4)
+    random_out = np.random.rand(4,4)
     target_out = random_out / np.sum(random_out, axis = 1, keepdims=True)
-    target_out *= 10
-    attention = SelfAttentionHead(sequence_length_in=2, token_length_in=4, token_length_out=4, learning_rate=0.1)
+    attention = MultiHeadSelfAttention(sequence_length_in=4, token_length_in=4, number_of_heads=4, learning_rate=0.001)
     loss = None
     while not loss or loss > 0.001:
         logging.debug('============= FORWARD PASS =============')
@@ -33,18 +32,4 @@ def test_sa_bacward():
     print(f'attempt: {attention.forward(input_data)}')
     print(f'target: {target_out}')
 
-
-def test_sa_backward_numerical():
-    data_in = np.array([[1,1,1,1],
-                        [2,2,2,3]])
-    perturbed = data_in + 0.01
-
-    layer = SelfAttentionHead(sequence_length_in=2, token_length_in=4, token_length_out=4, learning_rate = 0.001)
-    original_forward = layer.forward(data_in)
-    perturbed_forward = layer.forward(perturbed)
-
-    grads = layer.backward(original_forward)
-    print((1 + grads) * original_forward)
-    print(perturbed_forward)
-
-test_sa_backward_numerical()
+test_sa_backward()

@@ -1,6 +1,6 @@
-from selfAttention import MultiHeadSelfAttention
-from fullyConnected import FullyConnected2Layer
-from baseLayers import LayerNorm, Layer
+from selfattention import MultiHeadSelfAttention
+from fullyconnected import FullyConnected2Layer
+from baselayers import LayerNorm, Layer
 
 class transformer(Layer):
     def __init__(self, sequence_length, learning_rate=0.01):
